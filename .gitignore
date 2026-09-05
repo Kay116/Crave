@@ -1,0 +1,88 @@
+# Dependencies
+node_modules/
+
+# Expo generated files
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+
+# Generated native projects (Expo managed workflow)
+/ios/
+/android/
+.kotlin/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.env
+
+# Certificates, signing keys, and credentials
+*.jks
+*.keystore
+*.p8
+*.p12
+*.pem
+*.key
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+service-account*.json
+credentials.json
+credentials.json.old
+secrets.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing and coverage
+coverage/
+.nyc_output/
+test-results/
+
+# TypeScript and build caches
+*.tsbuildinfo
+.cache/
+.parcel-cache/
+.turbo/
+
+# Editor and local AI-tool settings
+.vscode/
+.idea/
+.claude/
+CLAUDE.md
+*.swp
+*.swo
+*~
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files and backups
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.orig.*
+*.zip
+
+# Local databases and data exports
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.sql
+
+# Project-specific backup created by reset-project
+/example/
