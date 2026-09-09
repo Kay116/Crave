@@ -1,45 +1,69 @@
-# Crave — Version 2
+# Crave — Version 3
 
-A premium, photo-first food discovery app built with Expo, React Native, and TypeScript. Version 2 turns a food recommendation into an actionable nearby restaurant search.
+Crave is a premium, photo-first food discovery app built with Expo, React Native, TypeScript, Google Places, and Supabase. Version 3 adds real accounts and a recommendation engine that learns across sessions.
 
-## Version 2 flow
+## Version 3 flow
 
 ```text
-Choose a craving → Swipe dishes → Get a match → Share location
-→ Find nearby restaurants → Compare distance, rating, price level, and open status
-→ Open the restaurant in Google Maps
+Create account or continue as guest
+→ Choose today’s mood
+→ Swipe dishes
+→ Save every preference session and swipe
+→ Build a time-weighted taste profile
+→ Improve the next recommendation
+→ Sync history across devices
 ```
 
-## New in Version 2
+## New in Version 3
 
-- Google Places API (New) Text Search integration
-- Foreground device-location permission with purpose-specific copy
-- 3 km, 5 km, and 10 km search radii
-- Restaurant results sorted by calculated straight-line distance
-- Live Google rating and review count
-- Google price level, current open/closed state, category, and address
-- Direct Google Maps links
-- Nearby search from the top recommendation, alternate matches, and saved dishes
-- Explicit loading, permission-denied, missing-key, API-error, and zero-result states
-- Version 1 local preference and like data migration
+- Email/password accounts through Supabase Auth
+- Email-confirmation, sign-in, sign-out, loading, error, and guest states
+- Persistent account sessions using AsyncStorage on native platforms
+- Cloud-backed preference sessions, swipe events, and saved dishes
+- Row Level Security policies limiting every record to its owner
+- Automatic migration of local Version 2 preferences, likes, and swipes
+- Automatic guest-history upload after sign-in
+- A new account dashboard with sync status and activity counts
+- A “Taste history” screen showing learned signals, recent swipes, and past cravings
+- A recency-weighted recommendation algorithm that learns from likes and passes
 
-Google Places returns a restaurant-level price category (`$`–`$$$$`), not the exact current menu price of a specific dish.
+Version 2’s nearby restaurant search remains included.
 
-## API setup
+## Recommendation model
 
-1. Create or select a project in [Google Cloud Console](https://console.cloud.google.com/).
-2. Enable billing and **Places API (New)**.
-3. Create an API key. For this MVP, restrict it to Places API (New) and set an appropriate quota.
-4. Copy `.env.example` to `.env.local`.
-5. Replace the placeholder value:
+The algorithm combines four layers:
+
+1. **Current mood matches** — strongest weight, so today’s intent wins.
+2. **Current cuisine matches** — a direct boost for selected cuisines.
+3. **Historical swipes** — likes strengthen similar moods/cuisines; passes gently reduce them.
+4. **Preference history** — frequently selected moods and cuisines add a smaller long-term signal.
+
+Swipe influence uses a 60-day half-life. Preference sessions use a 90-day half-life. This lets Crave learn without permanently trapping someone in old preferences.
+
+## Supabase setup
+
+1. Create a project at [Supabase](https://supabase.com/dashboard).
+2. Open **SQL Editor**, paste `supabase/schema.sql`, and run it once.
+3. Under **Authentication → Providers**, keep Email enabled.
+4. In **Project Settings → Connect**, select the Expo React Native/mobile instructions.
+5. Copy `.env.example` to `.env.local` and add your project values:
+
+```dotenv
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
+```
+
+The publishable key is designed for client use. Never put the Supabase `service_role` or secret key in an Expo environment variable.
+
+## Google Places setup
+
+Enable **Places API (New)** in Google Cloud, then add this to `.env.local`:
 
 ```dotenv
 EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your_google_places_api_key
 ```
 
-6. Restart Expo after changing the environment file.
-
-`EXPO_PUBLIC_` values are bundled into client applications. Before public release, move `findRestaurantsForDish` behind a server or edge-function proxy and keep the production key there.
+For a public production release, proxy the Places web-service request through a server or edge function instead of bundling that key into the client.
 
 ## Run it
 
@@ -48,7 +72,11 @@ npm install
 npm start
 ```
 
-Scan the QR code with Expo Go. Location and Google Places search are intended for the native iOS/Android build; web browsers can additionally be subject to Google Web Service CORS restrictions.
+Restart Expo whenever `.env.local` changes:
+
+```bash
+npm start -- --clear
+```
 
 ## Verify it
 
@@ -59,13 +87,18 @@ npx expo export --platform web
 
 ## Key files
 
-- `src/app/nearby.tsx` — permission, location, search, and restaurant-results UI
-- `src/services/places.ts` — Places request, response normalization, distance, and price formatting
-- `src/app/results.tsx` — recommendation-to-nearby handoff
-- `src/app/likes.tsx` — saved-dish-to-nearby handoff
-- `app.json` — Expo location permission configuration
-- `.env.example` — API configuration template
+- `src/context/auth-context.tsx` — auth session and account actions
+- `src/context/crave-context.tsx` — local state, learning model, migration, and cloud sync
+- `src/services/supabase.ts` — Expo-compatible Supabase client
+- `src/services/cloud-history.ts` — cloud read/write boundary
+- `src/app/auth.tsx` — sign-in and account creation
+- `src/app/account.tsx` — account and synchronization dashboard
+- `src/app/history.tsx` — preference and swipe-history insights
+- `supabase/schema.sql` — tables, indexes, constraints, and RLS policies
 
-## Data and privacy
+## Privacy and data behavior
 
-Coordinates are used for the active Places search and are not persisted by Crave. Google processes the restaurant request according to Google Maps Platform terms. Crave stores only onboarding, food preferences, swipe history, and saved dish IDs on the device.
+- Guests stay fully local.
+- Signed-in users sync preference sessions, swipe events, and saved dish IDs.
+- Location coordinates are used only for the active restaurant search and are not saved in the Crave schema.
+- Account data is isolated by Supabase Row Level Security.

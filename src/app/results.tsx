@@ -12,7 +12,8 @@ export default function ResultsScreen() {
   const liked = store.recommendations.filter((dish) => store.likedIds.includes(dish.id));
   const picks = (liked.length ? liked : store.recommendations).slice(0, 3);
   const top = picks[0];
-  const confidence = Math.min(98, 76 + Math.round(scoreDish(top, store.moods, store.cuisines, store.swipes) * 1.5));
+  const confidence = Math.min(98, Math.max(68, 72 + Math.round(scoreDish(top, store.moods, store.cuisines, store.swipes, store.swipeHistory, store.preferenceHistory))));
+  const learnedSignal = store.tasteProfile.find((signal) => top.moods.includes(signal.label as typeof top.moods[number]) || signal.label === top.cuisine);
 
   return <SafeAreaView style={styles.safe}>
     <BrandHeader />
@@ -30,7 +31,7 @@ export default function ResultsScreen() {
           <View style={styles.details}><Text style={styles.detail}>{'$'.repeat(top.price)} price</Text><Text style={styles.detail}>•</Text><Text style={styles.detail}>{top.time} min</Text></View>
         </View>
       </View>
-      <View style={styles.why}><Text style={styles.spark}>✦</Text><View style={styles.whyCopy}><Text style={styles.whyTitle}>Why this is your match</Text><Text style={styles.whyText}>{top.moods.slice(0, 3).join(', ')} hits the notes you chose—and lines up with the dishes that made you stop.</Text></View></View>
+      <View style={styles.why}><Text style={styles.spark}>✦</Text><View style={styles.whyCopy}><Text style={styles.whyTitle}>Why this is your match</Text><Text style={styles.whyText}>{top.moods.slice(0, 3).join(', ')} fits today’s mood{learnedSignal ? `, while your history shows a growing preference for ${learnedSignal.label}` : ''}.</Text></View></View>
       {picks.length > 1 && <><Text style={styles.also}>ALSO CALLING YOUR NAME</Text><View style={styles.row}>{picks.slice(1).map((dish) => <Pressable key={dish.id} onPress={() => router.push({ pathname: '/nearby', params: { dishId: dish.id } })} style={styles.mini}><Image source={dish.image} style={styles.miniImage} contentFit="cover" /><Text numberOfLines={1} style={styles.miniName}>{dish.name}</Text><Text style={styles.miniCuisine}>{dish.cuisine} · Find nearby →</Text></Pressable>)}</View></>}
       <Pressable onPress={() => router.push({ pathname: '/nearby', params: { dishId: top.id } })} style={styles.primary}><View><Text style={styles.primaryEyebrow}>READY TO EAT?</Text><Text style={styles.primaryText}>Find {top.name} nearby</Text></View><Text style={styles.primaryArrow}>⌖</Text></Pressable>
       <Pressable onPress={() => router.push('/likes')} style={styles.secondary}><Text style={styles.secondaryText}>See everything I liked</Text><Text style={styles.secondaryText}>♥</Text></Pressable>
