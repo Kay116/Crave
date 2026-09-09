@@ -10,7 +10,8 @@ type CraveContextValue = PersistedState & {
   recordSwipe: (dishId: string, choice: SwipeChoice) => void; toggleLike: (dishId: string) => void;
   clearSession: () => void; resetAll: () => Promise<void>;
 };
-const KEY = '@crave/v1';
+const KEY = '@crave/v2';
+const LEGACY_KEY = '@crave/v1';
 const initial: PersistedState = { hasOnboarded: false, moods: [], cuisines: [], swipes: [], likedIds: [] };
 const Context = createContext<CraveContextValue | null>(null);
 
@@ -26,7 +27,7 @@ export function scoreDish(dish: Dish, moods: Mood[], cuisines: Cuisine[], swipes
 export function CraveProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState(initial);
   const [hydrated, setHydrated] = useState(false);
-  useEffect(() => { AsyncStorage.getItem(KEY).then((raw) => { if (raw) setState({ ...initial, ...JSON.parse(raw) }); }).catch(() => {}).finally(() => setHydrated(true)); }, []);
+  useEffect(() => { Promise.all([AsyncStorage.getItem(KEY), AsyncStorage.getItem(LEGACY_KEY)]).then(([current, legacy]) => { const raw = current ?? legacy; if (raw) setState({ ...initial, ...JSON.parse(raw) }); }).catch(() => {}).finally(() => setHydrated(true)); }, []);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEY, JSON.stringify(state)).catch(() => {}); }, [hydrated, state]);
   const update = (patch: Partial<PersistedState>) => setState((current) => ({ ...current, ...patch }));
   const value = useMemo<CraveContextValue>(() => ({

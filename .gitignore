@@ -1,87 +1,44 @@
-# Dependencies
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
 node_modules/
 
-# Expo generated files
+# Expo
 .expo/
 dist/
 web-build/
 expo-env.d.ts
-.metro-health-check*
 
-# Generated native projects (Expo managed workflow)
-/ios/
-/android/
+# Native
 .kotlin/
-
-# Environment variables and secrets
-.env
-.env.*
-*.env
-
-# Certificates, signing keys, and credentials
+*.orig.*
 *.jks
-*.keystore
 *.p8
 *.p12
-*.pem
 *.key
 *.mobileprovision
-google-services.json
-GoogleService-Info.plist
-service-account*.json
-credentials.json
-credentials.json.old
-secrets.json
 
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+# Metro
+.metro-health-check*
 
-# Testing and coverage
-coverage/
-.nyc_output/
-test-results/
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
 
-# TypeScript and build caches
-*.tsbuildinfo
-.cache/
-.parcel-cache/
-.turbo/
-
-# Editor and local AI-tool settings
-.vscode/
-.idea/
-.claude/
-CLAUDE.md
-*.swp
-*.swo
-*~
-
-# Operating-system files
+# macOS
 .DS_Store
-Thumbs.db
-Desktop.ini
+*.pem
 
-# Temporary files and backups
-tmp/
-temp/
-*.tmp
-*.temp
-*.bak
-*.backup
-*.orig
-*.orig.*
-*.zip
+# local env files
+.env
+.env*.local
 
-# Local databases and data exports
-*.db
-*.sqlite
-*.sqlite3
-*.dump
-*.sql
+# typescript
+*.tsbuildinfo
 
-# Project-specific backup created by reset-project
-/example/
+example
+
+# generated native folders
+/ios
+/android
