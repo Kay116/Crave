@@ -67,20 +67,19 @@ security definer
 set search_path = public
 as $$
 declare
-  alphabet constant text := 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  raw bytea;
-  code text;
-  i int;
+  v_alphabet constant text := 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  v_raw bytea;
+  v_code text;
 begin
   loop
-    raw := decode(replace(gen_random_uuid()::text, '-', ''), 'hex');
-    code := '';
-    for i in 0..5 loop
-      code := code || substr(alphabet, (get_byte(raw, i) % length(alphabet)) + 1, 1);
+    v_raw := decode(replace(gen_random_uuid()::text, '-', ''), 'hex');
+    v_code := '';
+    for v_i in 0..5 loop
+      v_code := v_code || substr(v_alphabet, (get_byte(v_raw, v_i) % length(v_alphabet)) + 1, 1);
     end loop;
-    exit when not exists (select 1 from public.craving_rooms r where r.code = code);
+    exit when not exists (select 1 from public.craving_rooms r where r.code = v_code);
   end loop;
-  return code;
+  return v_code;
 end;
 $$;
 
@@ -110,9 +109,9 @@ begin
     public.generate_room_code(),
     coalesce(nullif(trim(p_name), ''), 'Crave room'),
     auth.uid(),
-    coalesce(p_dish_ids, '{}'),
-    coalesce(p_moods, '{}'),
-    coalesce(p_cuisines, '{}'),
+    coalesce(p_dish_ids, '{}'::text[]),
+    coalesce(p_moods, '{}'::text[]),
+    coalesce(p_cuisines, '{}'::text[]),
     case when p_expires then now() + interval '24 hours' else null end
   )
   returning * into v_room;
