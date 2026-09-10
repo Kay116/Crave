@@ -1,357 +1,273 @@
-# Crave — Version 4
+<div align="center">
 
-Crave is a premium, photo-first food discovery app built with Expo, React Native,
-TypeScript, Google Places, and Supabase. Version 4 adds **shared craving rooms**
-so a group can decide together, and a **much larger, richer dish catalog** with
-multiple photos per dish and deeper preference filters.
+# 🍽️ Crave
 
-Everything from Version 3 is preserved: guest usage, Supabase email/password
-accounts, account-isolated storage, preference/swipe history, the recency-weighted
-recommendation model, saved dishes, and the nearby Google Places search.
+### Decide what to eat — solo or with friends — by swiping.
+
+Photo-first food discovery with a recommendation engine that **learns from your swipes**,
+real-time multiplayer **“craving rooms”** for deciding as a group, and
+**account-isolated, local-first sync** that behaves correctly offline.
+
+<br/>
+
+![Expo](https://img.shields.io/badge/Expo-SDK%2057-000020?logo=expo&logoColor=white&style=flat-square)
+![React Native](https://img.shields.io/badge/React%20Native-0.86-61DAFB?logo=react&logoColor=black&style=flat-square)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white&style=flat-square)
+![Supabase](https://img.shields.io/badge/Supabase-Auth%20%C2%B7%20Postgres%20%C2%B7%20RLS%20%C2%B7%20Realtime-3FCF8E?logo=supabase&logoColor=white&style=flat-square)
+![Tests](https://img.shields.io/badge/tests-26%20passing-3FB950?style=flat-square)
+![Platforms](https://img.shields.io/badge/runs%20on-iOS%20%C2%B7%20Android%20%C2%B7%20Web-8957E5?style=flat-square)
+
+[Screenshots](#-screenshots) · [Why it’s interesting](#-engineering-highlights) · [Architecture](#-architecture) · [Quick start](#-quick-start)
+
+</div>
 
 ---
 
-## What's new in Version 4
+## 📸 Screenshots
 
-| Area | Version 4 |
+> _Add three PNGs to `docs/screenshots/` — see [`docs/screenshots/README.md`](docs/screenshots/README.md) for the exact shots and sizes._
+
+| Swipe to discover | Your match, explained | Decide as a group |
+| :---: | :---: | :---: |
+| ![Swipe screen](docs/screenshots/swipe.png) | ![Results screen](docs/screenshots/results.png) | ![Craving room](docs/screenshots/room.png) |
+
+---
+
+## ✨ Engineering highlights
+
+These are the parts that were actually hard — and where the interesting code lives.
+
+- **Account-isolated, local-first storage.** Every identity (guest, and each signed-in
+  user) gets its own storage key, so one account’s history can never be read into — or
+  uploaded from — another on a shared device. Guest history migrates into an account
+  **exactly once**. A dish un-liked while offline **stays un-liked** after the next
+  sync (tombstones + “cloud-authoritative after pending ops”, not a blind union).
+
+- **RLS-enforced multiplayer.** Rooms are readable only by their members. Joining is a
+  Postgres `SECURITY DEFINER` function keyed on a short invite code, so rooms **can’t be
+  enumerated by ID**. Individual swipe choices never leave the database — the results
+  screen gets **aggregate counts only**, via a dedicated RPC.
+
+- **A pure, unit-tested core.** Scoring, filtering, deck selection, per-account merge,
+  and like-reconciliation live in dependency-free modules with **26 `node:test`
+  tests**. The React Native app is a thin shell over them.
+
+- **Consensus group algorithm.** Ranks dishes by _unanimous likes → liked by the most
+  people → personalised tie-break → fewest passes_, and explains itself
+  (“3 of 4 friends liked this”).
+
+- **Realtime that degrades gracefully.** Supabase Realtime drives live room updates;
+  the client **re-fetches on every event** (so duplicate events and reconnects are
+  harmless) and runs a **polling fallback**, so a manual refresh always converges.
+
+- **Recency-weighted personalisation.** Likes/passes decay on a 60-day half-life;
+  the current session’s swipes are weighted above old history; over-strict filters
+  relax lowest-priority-first instead of returning an empty deck.
+
+---
+
+## 🧩 Features
+
+| | |
 | --- | --- |
-| **Shared rooms** | Create a room, share a 6-character code or link, everyone swipes the same deck, Crave computes the group's best match. New routes: `/friends`, `/room/[code]`, `/room/[code]/swipe`, `/room/[code]/results`. |
-| **Group algorithm** | Pure, tested `scoreGroup` / `scoreGroupFromTallies` that prioritise consensus (unanimous → most-liked → personalised → fewest passes). |
-| **Realtime** | Supabase Realtime for joins / completion / results, with a polling fallback so a manual refresh always works. |
-| **Native sharing** | Room invites, single dishes, solo results, group results, and restaurant links via the OS share sheet (Web Share API + copy fallback on web). |
-| **Catalog** | 48 curated dishes across 12 cuisines, 2–3 photos each, alt text, texture/meal-type/protein/dietary/spice tags, and Places search terms. |
-| **Multi-photo cards** | Tap the left/right edge of a swipe card (or open the details modal) to browse a dish's photos — no horizontal image swipe that would fight the like/pass gesture. `● ○ ○` position dots. |
-| **More filters** | Optional Texture / Meal type / Protein / Spice / Price / Dietary / Light-vs-filling / Hot-vs-cold behind a "More options" section. "Surprise me" still needs nothing selected. Over-strict filters relax the lowest-priority ones and say so. |
-
-Do **not** expect chat, friend requests, profiles, push notifications, or a full
-social graph — those are intentionally out of scope for this version.
+| **Solo discovery** | Mood / cuisine / texture / meal / protein / spice / price / dietary filters (or “Surprise me”), a swipeable photo-first deck, a “why this matched” explanation, and a nearby-restaurant search. |
+| **Craving rooms** | Create a room → share a 6-char code or link → everyone swipes the same deck → Crave computes the group’s match. Live join / completion / result states, 24-hour expiry, host-closes-room. |
+| **Accounts** | Supabase email/password with confirmation, password reset, and a full guest mode. History syncs across devices; guests stay fully local. |
+| **48-dish catalog** | 12 cuisines, 2–3 photos per dish with alt text and attribution, `expo-image` caching + fallback, next-card prefetch. |
+| **Native sharing** | OS share sheet on iOS/Android; Web Share API with clipboard fallback on web. Invite links only when a real public URL is configured — never a broken `localhost` link. |
 
 ---
 
-## Shared-room flow
+## 🛠 Tech stack
 
-```text
-Sign in
-→ Friends → Create a craving room (name, optional 24-hour expiry)
-→ Share the invitation code or link
-→ Friends open the link / enter the code (Friends → Join)
-→ Everyone swipes the same shared deck
-→ Each person finishes; Crave tallies likes/passes per dish
-→ Group result: best match + 2–3 alternatives + "3 of 4 friends liked this"
-→ Find the winning dish nearby, or share the result
+**Expo SDK 57** · React Native 0.86 · React 19 · **TypeScript (strict)** · `expo-router` (typed routes) ·
+**Supabase** (Auth · Postgres · Row Level Security · Realtime) · **Google Places API (New)** ·
+`expo-image` · React Native Reanimated · `node:test` + `tsx`
+
+---
+
+## 🏗 Architecture
+
+```mermaid
+flowchart TD
+    subgraph app["Expo Router app — iOS · Android · Web"]
+        UI["Screens<br/>welcome · preferences · swipe · results<br/>friends · room/:code/*"]
+        CTX["React contexts<br/>AuthProvider · CraveProvider · RoomProvider"]
+    end
+
+    subgraph core["Pure service modules — 26 unit tests, zero RN imports"]
+        REC["recommendation.ts<br/>personal scoring + filtered deck"]
+        GRP["group-score.ts<br/>consensus ranking"]
+        STORE["local-store.ts<br/>per-account merge / reconcile"]
+        HELP["invite.ts · room-helpers.ts"]
+    end
+
+    subgraph be["Backend"]
+        SB[("Supabase<br/>Auth · Postgres + RLS · Realtime")]
+        GP["Google Places API (New)"]
+    end
+
+    UI --> CTX
+    CTX --> REC & GRP & STORE & HELP
+    CTX -->|"auth · cloud history · rooms · RPCs"| SB
+    CTX -->|"nearby restaurants"| GP
 ```
 
-- **Signed-in users** can create and join live rooms.
-- **Guests** keep the normal solo experience and can still share individual
-  dishes and their solo result.
-- Room state moves through `waiting → swiping → completed`, plus `closed`
-  (creator ends it) and an `expired` view when a 24-hour room lapses.
-- Only room members can read a room, its members, or its aggregate results.
-  Individual swipe choices are never exposed — the results screen shows counts
-  only.
+- **Screens** are thin. Anything testable is pushed into `src/services/*` as a pure
+  function; those modules have **no React / RN / async imports** so they run under
+  plain Node.
+- **Contexts** own side effects: `AuthProvider` (session), `CraveProvider` (local
+  state, learning model, migration, cloud sync), `RoomProvider` (room load + realtime
+  + polling).
+- **Supabase** does the multi-user work: RLS policies + `SECURITY DEFINER` RPCs for
+  create/join/results; the app only ever holds the publishable (anon) key.
 
 ---
 
-## Data model
+## 🚀 Quick start
 
-### Dish (`src/types.ts`)
-
-```ts
-type DishImage = {
-  url: string;
-  alt: string;
-  sourceName?: string;    // e.g. "Unsplash"
-  sourceUrl?: string;
-  photographer?: string;  // only when known — never invented
-};
-
-type Dish = {
-  id: string;
-  name: string;
-  cuisine: Cuisine;            // 12 cuisines
-  description: string;
-  images: DishImage[];         // 2–3 per dish
-  moods: Mood[];
-  textures: string[];
-  mealTypes: string[];         // breakfast | lunch | dinner | snack | dessert
-  dietaryTags: string[];       // discovery metadata, NOT allergy/medical advice
-  proteins: string[];
-  spiceLevel: number;          // 0–4
-  price: number;               // 1–3
-  time: number;                // minutes
-  searchTerms: string[];       // Google Places queries
-  image: string;               // back-compat: === images[0].url
-  tags: string[];              // back-compat: short chips shown on the card
-};
+```bash
+git clone https://github.com/Kay116/Crave.git
+cd Crave
+npm install
+cp .env.example .env.local        # then fill in the values below
+npm start                         # press w for web, or a / i for a device
 ```
 
-`src/data/dishes.ts` builds every dish through `defineDish()`, which fills the
-legacy `image` / `tags` fields so older screens keep working while new screens
-use `images[]`.
-
-### Rooms (`craving_rooms`, `room_members`, `room_swipes`)
-
-```text
-craving_rooms(id, code, name, created_by, status, dish_ids,
-              selected_moods, selected_cuisines, created_at, expires_at)
-room_members(room_id, user_id, display_name, joined_at, completed_at)
-room_swipes(room_id, user_id, dish_id, choice, swiped_at)   -- PK (room_id,user_id,dish_id)
-```
-
-No latitude/longitude or other precise-location data is stored on a room.
-
----
-
-## Supabase migration
-
-Version 4 adds three tables, four RPCs, RLS policies, and realtime publication.
-
-### Fresh project
-
-Run **`supabase/schema.sql`** once in the Supabase SQL Editor. It contains the
-Version 3 tables **and** the Version 4 room objects.
-
-### Existing Version 3 project
-
-Run **`supabase/migrations/0001_v4_craving_rooms.sql`** once in the SQL Editor.
-It is idempotent (`create table if not exists`, `create or replace function`,
-`drop policy if exists`), so re-running it is safe.
-
-What it creates:
-
-- Tables `craving_rooms`, `room_members`, `room_swipes` + indexes.
-- `generate_room_code()` — secure random 6-char code from `gen_random_uuid()`
-  bytes over an unambiguous alphabet (no `0/O/1/I/L`), retrying on collision.
-- `create_craving_room(...)` — `SECURITY DEFINER`; creates the room and adds the
-  creator as the first member atomically.
-- `join_craving_room(p_code, p_display_name)` — `SECURITY DEFINER`; **the only
-  way to join a room you didn't create**, so rooms are never exposed by guessing
-  a UUID. Rejects closed / expired / unknown codes.
-- `room_results(p_room_id)` — `SECURITY DEFINER`; returns per-dish
-  `likes / passes / voters` **counts only** for members of that room.
-- RLS: members read their rooms and co-members; only the creator updates a room;
-  participants only ever read/insert/update **their own** `room_swipes`.
-- Adds the three tables to the `supabase_realtime` publication.
-
-Only the `anon` publishable key is used by the app. The `service_role` key is
-never referenced in client code or env.
-
----
-
-## Realtime setup
-
-`0001_v4_craving_rooms.sql` already runs:
-
-```sql
-alter publication supabase_realtime add table public.craving_rooms;
-alter publication supabase_realtime add table public.room_members;
-alter publication supabase_realtime add table public.room_swipes;
-```
-
-If you manage Realtime from the dashboard instead, enable replication for those
-three tables under **Database → Replication → `supabase_realtime`**.
-
-The client (`src/context/room-context.tsx`) subscribes with
-`supabase.channel(...).on('postgres_changes', ...)` and **re-fetches on every
-event** rather than trusting payloads, so duplicate events and reconnects are
-harmless. A slow polling loop (4–30 s depending on room phase) runs alongside,
-so the room still converges after a manual refresh if Realtime drops.
-
----
-
-## Email links (confirmation & password reset)
-
-Confirmation and password-reset emails send the user back to `<origin>/auth`.
-For that to work:
-
-1. **Supabase → Authentication → URL Configuration → Redirect URLs** — add every
-   origin the app runs on, e.g.
-   `http://localhost:8081/auth`, `http://localhost:8081/**`,
-   `https://your-app.example.com/auth`, `https://your-app.example.com/**`,
-   and `crave://auth` for the native build.
-   *If the redirect URL isn't allow-listed, Supabase silently ignores it and
-   sends the user to the **Site URL** instead — which is the usual cause of a
-   blank page after clicking a reset link.*
-2. **Site URL** — set it to the origin you actually serve (e.g.
-   `http://localhost:8081` in dev, your public URL in prod).
-3. The web client uses `detectSessionInUrl: true`, so supabase-js reads the
-   session/`type=recovery` params from the URL fragment on load. `auth.tsx` then
-   shows **"Set a new password"** (or **"That link didn't work"** for an
-   expired/used link → *Send a new reset link*).
-
-On native, the reset link opens `crave://auth`; test it on a device or simulator
-where that scheme is registered.
-
----
-
-## `EXPO_PUBLIC_APP_URL` setup
-
-Set this to the **public HTTPS origin** where the web build is hosted (no
-trailing slash):
+**`.env.local`**
 
 ```dotenv
-EXPO_PUBLIC_APP_URL=https://crave.example.com
+EXPO_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable-anon-key>
+EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=<places-api-new-key>   # optional; only the nearby search needs it
+EXPO_PUBLIC_APP_URL=https://your-deploy.example.com      # optional; makes room invite links clickable
 ```
 
-- When set to a real public URL, a room invite includes
-  `https://crave.example.com/room/ABC234`.
-- When blank, `http://…`, or a `localhost` / private-LAN address, the invite
-  shares the **code only** with manual-entry instructions — Crave never sends a
-  broken localhost link.
+**Supabase (one-time):** open the SQL Editor and run
+[`supabase/schema.sql`](supabase/schema.sql) on a fresh project, or
+[`supabase/migrations/0001_v4_craving_rooms.sql`](supabase/migrations/0001_v4_craving_rooms.sql)
+to add the room tables to an existing one. Both are idempotent. Then add
+`http://localhost:8081/**` and your deploy URL to
+**Authentication → URL Configuration → Redirect URLs** so email links work.
+
+**Deploy the web build:** `npx expo export --platform web` produces a static
+`dist/` you can drop on Vercel / Netlify / GitHub Pages. Set `EXPO_PUBLIC_APP_URL`
+to that URL and share links resolve to `/room/<code>`.
 
 ---
 
-## Image-source policy
-
-- Every dish photo is hot-linked from the **Unsplash CDN** and used under the
-  [Unsplash License](https://unsplash.com/license), which permits this use.
-- `sourceName` is set to `Unsplash`; `photographer` is included only where it is
-  actually known — credits are never fabricated.
-- Do not scrape or embed images from Google, Yelp, restaurant sites, or other
-  unauthorised sources. Swap in owned or properly licensed assets before a real
-  launch, keeping the same `DishImage` shape.
-- `src/components/smart-image.tsx` (`SmartImage`) adds `expo-image` disk+memory
-  caching, a blur placeholder, and an automatic fallback image if a URL fails —
-  a broken photo never breaks a card.
-- The catalog was checked for broken URLs, duplicate image IDs, and duplicate
-  dish IDs (all 100 image URLs return 200/302; 0 duplicates).
-
----
-
-## Recommendation model
-
-### Personal (`src/services/recommendation.ts`)
-
-Layers, in order of weight:
-
-1. **Current mood** matches — today's intent wins.
-2. **Current cuisine** filter (a hard filter with graceful relaxation).
-3. **Version 4 attributes** — texture / meal-type / protein / dietary / spice /
-   price / hot-cold / light-filling.
-4. **Current-session swipes** — weighted `×1.6` so they outrank old history.
-5. **Historical swipes** — 60-day half-life; likes strengthen, passes soften.
-6. **Preference history** — 90-day half-life, smaller long-term signal.
-
-`selectDeck(filters, ctx)` applies the hard filters, and if the deck would be too
-small it relaxes them **lowest priority first** (texture → … → cuisine; `dietary`
-is never auto-relaxed) and reports which filters were eased. "Surprise me" passes
-no filters and returns the whole catalog.
-
-### Group (`src/services/group-score.ts`)
-
-`scoreGroup` / `scoreGroupFromTallies` rank dishes by:
-
-1. **Unanimous likes**
-2. **Most participants liked it** (also the match %)
-3. **Highest combined personalised score** (tie-break only; never shown to users)
-4. **Fewest passes** (final tie-break)
-
-Duplicate / re-cast swipes collapse to the latest choice per (user, dish).
-`everyoneFinished` is surfaced so results can show provisional vs final.
-
----
-
-## Run it
+## ✅ Tests & checks
 
 ```bash
-npm install
-npm start                 # or: npm run web / android / ios
-npm start -- --clear      # after changing .env.local
-```
-
-## Verify it
-
-```bash
-npm run verify            # tsc + test typecheck + expo lint + unit tests
+npm run verify      # tsc (strict) + test typecheck + expo lint + unit tests
+npm test            # just the 26 unit tests (node:test via tsx)
 npx expo-doctor
 npx expo export --platform web --clear
-git status
 ```
 
-`npm test` runs the focused unit suite (Node's test runner via `tsx`):
+The suite (`src/services/__tests__/`) covers:
 
-- personal recommendation scoring & session-vs-history weighting
-- strict filters relaxing to reasonable matches; dietary respected
-- group scoring: unanimous, split, partial completion, no-likes
-- duplicate swipe collapsing
-- room code validation & expiration / phase
-- guest→account merge (once) & account-key isolation
-- a saved dish removed offline staying removed after sync
-- invite messages never leaking a localhost link
-
-### Manual checks
-
-1. New user → **Start craving** → signup screen (not `/preferences`).
-2. Continue as guest → preferences (incl. **More options** & **Surprise me**) →
-   swipe → results → likes.
-3. Guest history → sign in → history migrates once.
-4. User A signs out → guest state has none of A's history.
-5. User B signs in → A's history is never uploaded or shown.
-6. Remove a saved dish → stays removed after the next sync.
-7. Web location denial → "Try again", never `Linking.openSettings()`.
-8. Restart the app → correct state for the current account.
-9. Create a room; join from a second account; share the code; both swipe the
-   deck; group result appears; refresh mid-room; try a bad/expired code.
-10. Browse a card's photos (tap edges / details modal) without liking/passing.
-
----
-
-## Key files
-
-| File | Purpose |
+| Area | Cases |
 | --- | --- |
-| `src/types.ts` | Dish, filter, and room types |
-| `src/data/dishes.ts` | 48-dish catalog + `defineDish` + fallback image |
-| `src/services/recommendation.ts` | pure personal scoring + `selectDeck` |
-| `src/services/group-score.ts` | pure group scoring |
-| `src/services/local-store.ts` | pure per-account state helpers (merge / reconcile) |
-| `src/services/rooms.ts` / `room-helpers.ts` | Supabase room I/O + pure code/expiry helpers |
-| `src/services/sharing.ts` / `invite.ts` | native share + pure invite-message builder |
-| `src/services/recent-rooms.ts` | per-account list of recently seen rooms |
-| `src/context/crave-context.tsx` | local state, learning model, migration, cloud sync |
-| `src/context/room-context.tsx` | room load + realtime + polling + actions |
-| `src/components/swipe-card.tsx` | multi-photo swipe card |
-| `src/components/dish-details.tsx` | photo-carousel details modal |
-| `src/components/smart-image.tsx` | cached image with placeholder + fallback |
-| `src/app/friends.tsx`, `src/app/room/[code]/*` | room screens |
-| `supabase/schema.sql` | full baseline schema (V3 + V4) |
-| `supabase/migrations/0001_v4_craving_rooms.sql` | standalone V4 migration |
+| Personal scoring | mood/cuisine weighting · session-vs-history · attribute filters |
+| Filtered deck | over-strict filters relax lowest-priority-first · dietary respected · “Surprise me” |
+| Group scoring | unanimous · split vote · partial completion · no-likes · personal tie-break |
+| Rooms | invite-code validation · expiry / phase transitions |
+| Sync & isolation | guest→account merge (once) · account-key isolation · offline like-removal stays removed |
+| Sharing | invite messages never leak a `localhost` link |
 
 ---
 
-## Privacy & security
+<details>
+<summary><b>Supabase schema, RLS & realtime (details)</b></summary>
 
-- Guests stay fully local. Signed-in users sync only preference sessions, swipe
-  events, and saved dish IDs.
-- Per-account local storage keys (`@crave/v3/guest`, `@crave/v3/user/<id>`) keep
-  one account's data from ever being written into — or uploaded from — another on
-  a shared device. Guest history migrates into an account **at most once, ever**.
-- Room data is readable only by room members; individual votes are never exposed.
-- Location coordinates are used only for the active restaurant search and are not
-  stored in the Crave schema or on a room.
-- No API key, access token, password, session object, or Supabase secret is
-  logged or committed. `.env.local` stays git-ignored; `.env.example` holds
-  placeholders only.
+**Tables** (`supabase/schema.sql`): `profiles`-free — auth is Supabase Auth only.
+`preference_sessions`, `swipe_events`, `saved_dishes` (V3) + `craving_rooms`,
+`room_members`, `room_swipes` (V4). Every table has RLS enabled.
+
+**Room policies**
+
+- `craving_rooms` — `select` requires membership; `update` requires `created_by = auth.uid()`.
+- `room_members` — a member can see co-members; only the creator can self-insert (everyone
+  else joins via the RPC); update/delete limited to your own row.
+- `room_swipes` — you can only read/insert/update **your own** rows.
+
+**Functions** (`SECURITY DEFINER`, `search_path = public`)
+
+- `generate_room_code()` — secure random 6 chars, unambiguous alphabet (no `0/O/1/I/L`), retries on collision.
+- `create_craving_room(...)` — creates the room + adds the creator as member atomically.
+- `join_craving_room(code, name)` — the **only** way to join a room you didn’t create; rejects closed / expired / unknown codes.
+- `room_results(room_id)` — returns per-dish `likes / passes / voters` **counts**, never who voted.
+
+**Realtime** — the migration adds the three room tables to the `supabase_realtime`
+publication. `RoomProvider` subscribes and re-fetches on each event; a 4–30 s
+polling loop (cadence by room phase) is the fallback.
+
+</details>
+
+<details>
+<summary><b>Data model (details)</b></summary>
+
+```ts
+type DishImage = { url: string; alt: string; sourceName?: string; photographer?: string };
+
+type Dish = {
+  id: string; name: string; cuisine: Cuisine; description: string;
+  images: DishImage[];                       // 2–3 per dish
+  moods: Mood[]; textures: string[]; mealTypes: string[];
+  dietaryTags: string[]; proteins: string[]; // discovery metadata — not allergy advice
+  spiceLevel: number; price: number; time: number;
+  searchTerms: string[];                     // Google Places queries
+  image: string; tags: string[];             // back-compat, always populated
+};
+```
+
+`craving_rooms(id, code, name, created_by, status, dish_ids, selected_moods,
+selected_cuisines, created_at, expires_at)` — no location data is ever stored on a room.
+
+</details>
+
+<details>
+<summary><b>Image sourcing</b></summary>
+
+Dish photos are hot-linked from the Unsplash CDN under the
+[Unsplash License](https://unsplash.com/license); `sourceName`/`photographer` are kept
+for attribution (never fabricated). Swap in owned or licensed assets before any real
+launch — the `DishImage` shape stays the same. All 100 image URLs were checked
+(200/302, no duplicates).
+
+</details>
+
+<details>
+<summary><b>Known limitations</b></summary>
+
+- `expo-doctor` flags a few Expo packages a patch behind the SDK’s preferred versions
+  (pre-existing; bump with `npx expo install --check` when ready).
+- The group personalised tie-break uses the **viewer’s** own history (other members’
+  histories aren’t shared, by design), so ordering of tied dishes can differ per viewer.
+- Guest auto-migration is **once per device** — a second guest session after a migration
+  won’t auto-merge into a later account (that account’s cloud history still loads).
+- A few secondary dish photos are cuisine-appropriate stock rather than the exact plate.
+- `EXPO_PUBLIC_*` values are bundled into the client by design (publishable keys only) —
+  proxy the Google Places call before a public production release.
+
+</details>
 
 ---
 
-## Known limitations
+## 📁 Repo tour
 
-- **expo-doctor** reports 4 Expo packages a patch or two behind the SDK's
-  preferred versions (`expo`, `expo-router`, `@expo/ui`, `expo-glass-effect`).
-  This pre-dates Version 4 and is left as-is to avoid pulling in unvetted
-  versions; run `npx expo install --check` when you're ready to bump them.
-- The **group personalised tie-break** uses the *viewing* member's own history
-  (other members' histories aren't shared, by design), so ordering of otherwise-
-  tied dishes can differ slightly per viewer.
-- **Guest auto-migration is once-per-device.** A second guest session after a
-  migration won't auto-merge into a later account (their cloud history still
-  loads normally) — the deliberate cost of never leaking one account's data into
-  another.
-- A few **secondary dish photos** are cuisine-appropriate stock rather than the
-  exact plated dish; all URLs are verified and the details modal shows source
-  attribution.
-- Realtime needs the three room tables in the `supabase_realtime` publication
-  (the migration does this); without it the app still works via polling.
-- `EXPO_PUBLIC_*` values are bundled into the client by design (publishable keys
-  only) — proxy the Google Places call before a public production release.
+| Path | What |
+| --- | --- |
+| `src/app/` | Screens (`expo-router` file routes) — welcome, preferences, swipe, results, likes, history, nearby, auth, account, **friends**, **room/[code]/**\* |
+| `src/context/` | `auth-context`, `crave-context`, `room-context` |
+| `src/services/` | Pure logic: `recommendation`, `group-score`, `local-store`, `invite`, `room-helpers`, `sharing` · plus `rooms`, `cloud-history`, `places`, `supabase` |
+| `src/services/__tests__/` | 26 `node:test` unit tests |
+| `src/components/` | `swipe-card` (multi-photo gesture card), `dish-details` (carousel modal), `smart-image` (cached + fallback) |
+| `supabase/` | `schema.sql` + `migrations/0001_v4_craving_rooms.sql` |
+
+---
+
+## 📄 License
+
+MIT — see [`LICENSE`](LICENSE). _(Update the copyright line to your name.)_
