@@ -2,11 +2,19 @@
 
 # 🍽️ Crave
 
-### Decide what to eat — solo or with friends — by swiping.
+### Kill the *“I don’t know, what do you feel like?”* dinner spiral — swipe on it instead.
 
-Photo-first food discovery with a recommendation engine that **learns from your swipes**,
-real-time multiplayer **“craving rooms”** for deciding as a group, and
-**account-isolated, local-first sync** that behaves correctly offline.
+Crave turns an endless group chat into a decision. Swipe through a photo-first deck and a
+recommendation engine learns your taste from **every like and pass**. Can’t agree with
+friends? Open a **craving room** — everyone swipes the same dishes on their own phone and
+Crave surfaces the one pick you’ll *all* be happy with, then finds it near you.
+
+<br/>
+
+<!-- 👉 After you deploy the web build, replace the href below with your URL (e.g. https://crave.vercel.app) -->
+[![▶ Live demo](https://img.shields.io/badge/▶%20%20LIVE%20DEMO-open%20in%20browser-F76747?style=for-the-badge&labelColor=24211E)](#-live-demo)
+&nbsp;
+[![Screenshots](https://img.shields.io/badge/screenshots-below-8957E5?style=for-the-badge&labelColor=24211E)](#-screenshots)
 
 <br/>
 
@@ -17,15 +25,37 @@ real-time multiplayer **“craving rooms”** for deciding as a group, and
 ![Tests](https://img.shields.io/badge/tests-26%20passing-3FB950?style=flat-square)
 ![Platforms](https://img.shields.io/badge/runs%20on-iOS%20%C2%B7%20Android%20%C2%B7%20Web-8957E5?style=flat-square)
 
-[Screenshots](#-screenshots) · [Why it’s interesting](#-engineering-highlights) · [Architecture](#-architecture) · [Quick start](#-quick-start)
+<sub>Solo portfolio build, focused on the hard parts: **offline-correct multi-account sync**, **RLS-enforced realtime multiplayer**, and a **pure, unit-tested recommendation core**.</sub>
+
+[Live demo](#-live-demo) · [Screenshots](#-screenshots) · [Why it’s interesting](#-engineering-highlights) · [Architecture](#-architecture) · [Quick start](#-quick-start)
 
 </div>
 
 ---
 
+## ▶ Live demo
+
+> **[🍽️ Open Crave in your browser →](#)** &nbsp;<!-- replace # with your deploy URL, e.g. https://crave.vercel.app -->
+>
+> No install. Tap **“Continue as guest”** to try discovery + swiping instantly, or make a
+> throwaway account to test cross-device sync and craving rooms. On desktop, shrink the
+> window to phone width for the intended layout.
+
+**Not deployed yet?** It’s a static site — two minutes:
+
+```bash
+npx expo export --platform web        # builds ./dist
+# drag ./dist onto app.netlify.com/drop  —  or  —  vercel deploy dist --prod
+```
+
+Then set `EXPO_PUBLIC_APP_URL` to the deployed URL so room-invite links resolve to
+`/room/<code>`, and paste the URL into the link above.
+
+---
+
 ## 📸 Screenshots
 
-> _Add three PNGs to `docs/screenshots/` — see [`docs/screenshots/README.md`](docs/screenshots/README.md) for the exact shots and sizes._
+> _Add three PNGs to `docs/screenshots/` — see [`docs/screenshots/README.md`](docs/screenshots/README.md) for the exact shots and sizes. A short `demo.gif` here is even better._
 
 | Swipe to discover | Your match, explained | Decide as a group |
 | :---: | :---: | :---: |
@@ -150,9 +180,8 @@ to add the room tables to an existing one. Both are idempotent. Then add
 `http://localhost:8081/**` and your deploy URL to
 **Authentication → URL Configuration → Redirect URLs** so email links work.
 
-**Deploy the web build:** `npx expo export --platform web` produces a static
-`dist/` you can drop on Vercel / Netlify / GitHub Pages. Set `EXPO_PUBLIC_APP_URL`
-to that URL and share links resolve to `/room/<code>`.
+**Deploy the web build:** see [Live demo](#-live-demo) above — `expo export` →
+static `dist/` → any host.
 
 ---
 
