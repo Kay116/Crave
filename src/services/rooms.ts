@@ -54,6 +54,23 @@ const requireClient = () => {
   return supabase;
 };
 
+const SETUP_HINT =
+  'Shared rooms aren’t set up on this Supabase project yet. Run supabase/migrations/0001_v4_craving_rooms.sql in the SQL Editor, then reload the API schema (Dashboard → Settings → API → "Reload schema", or run  notify pgrst, \'reload schema\';  ).';
+
+// Turn a "the room objects don't exist / schema cache is stale" Postgres/PostgREST
+// error into an actionable message; pass everything else straight through.
+function roomError(error: { message?: string; code?: string; hint?: string | null } | null): Error {
+  const message = error?.message ?? 'Room request failed.';
+  const code = error?.code ?? '';
+  if (
+    code === 'PGRST202' || code === 'PGRST205' || code === '42883' || code === '42P01' ||
+    /schema cache|Could not find the (function|table)|relation .* does not exist|function .* does not exist/i.test(message)
+  ) {
+    return new Error(SETUP_HINT);
+  }
+  return new Error(message);
+}
+
 // ------------------------------------------------------------------- queries
 export async function createRoom(params: {
   name: string; dishIds: string[]; moods: Mood[]; cuisines: Cuisine[]; displayName: string; expires: boolean;
@@ -67,7 +84,7 @@ export async function createRoom(params: {
     p_display_name: params.displayName,
     p_expires: params.expires,
   });
-  if (error) throw new Error(error.message);
+  if (error) throw roomError(error);
   return toRoom(data as RoomRow);
 }
 
@@ -77,35 +94,35 @@ export async function joinRoom(code: string, displayName: string): Promise<Cravi
     p_code: normalizeRoomCode(code),
     p_display_name: displayName,
   });
-  if (error) throw new Error(error.message);
+  if (error) throw roomError(error);
   return toRoom(data as RoomRow);
 }
 
 export async function fetchRoomByCode(code: string): Promise<CravingRoom | null> {
   const client = requireClient();
   const { data, error } = await client.from('craving_rooms').select('*').eq('code', normalizeRoomCode(code)).maybeSingle();
-  if (error) throw new Error(error.message);
+  if (error) throw roomError(error);
   return data ? toRoom(data as RoomRow) : null;
 }
 
 export async function fetchMembers(roomId: string): Promise<RoomMember[]> {
   const client = requireClient();
   const { data, error } = await client.from('room_members').select('*').eq('room_id', roomId).order('joined_at', { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) throw roomError(error);
   return (data as MemberRow[] | null ?? []).map(toMember);
 }
 
 export async function fetchMySwipes(roomId: string): Promise<RoomSwipe[]> {
   const client = requireClient();
   const { data, error } = await client.from('room_swipes').select('*').eq('room_id', roomId);
-  if (error) throw new Error(error.message);
+  if (error) throw roomError(error);
   return (data as SwipeRow[] | null ?? []).map(toSwipe);
 }
 
 export async function fetchRoomResults(roomId: string): Promise<RoomResultTally[]> {
   const client = requireClient();
   const { data, error } = await client.rpc('room_results', { p_room_id: roomId });
-  if (error) throw new Error(error.message);
+  if (error) throw roomError(error);
   return (data as { dish_id: string; likes: number; passes: number; voters: number }[] | null ?? []).map((row) => ({
     dishId: row.dish_id, likes: row.likes, passes: row.passes, voters: row.voters,
   }));
@@ -117,20 +134,20 @@ export async function submitRoomSwipe(roomId: string, userId: string, dishId: st
     { room_id: roomId, user_id: userId, dish_id: dishId, choice, swiped_at: new Date().toISOString() },
     { onConflict: 'room_id,user_id,dish_id' },
   );
-  if (error) throw new Error(error.message);
+  if (error) throw roomError(error);
 }
 
 export async function markMemberComplete(roomId: string, userId: string): Promise<void> {
   const client = requireClient();
   const { error } = await client.from('room_members').update({ completed_at: new Date().toISOString() })
     .eq('room_id', roomId).eq('user_id', userId).is('completed_at', null);
-  if (error) throw new Error(error.message);
+  if (error) throw roomError(error);
 }
 
 export async function setRoomStatus(roomId: string, status: RoomStatus): Promise<void> {
   const client = requireClient();
   const { error } = await client.from('craving_rooms').update({ status }).eq('id', roomId);
-  if (error) throw new Error(error.message);
+  if (error) throw roomError(error);
 }
 
 // ------------------------------------------------------------------ realtime
