@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { dishes } from '@/data/dishes';
-import { Coordinates, findRestaurantsForDish, formatPrice, PlacesConfigurationError, Restaurant } from '@/services/places';
+import { Coordinates, findRestaurantsForDish, formatPrice, Restaurant } from '@/services/places';
 import { goBack } from '@/services/nav';
 import { shareRestaurant } from '@/services/sharing';
 import { colors, fonts, radius, shadow, spacing } from '@/theme';
@@ -43,7 +43,7 @@ export default function NearbyScreen() {
       setRestaurants(places);
       setStatus('done');
     } catch (error) {
-      setMessage(error instanceof PlacesConfigurationError ? 'Add your Google Places API key to the .env file, then restart Expo.' : error instanceof Error ? error.message : 'Restaurant search failed. Please try again.');
+      setMessage(error instanceof Error ? error.message : 'Restaurant search failed. Please try again.');
       setStatus('error');
     }
   };

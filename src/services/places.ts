@@ -56,9 +56,17 @@ function normalizePriceLevel(value?: string) {
   return value && value in levels ? levels[value] : null;
 }
 
+// Tolerate the usual env / CI-secret paste mistakes: surrounding quotes, stray
+// whitespace, or the "KEY=" prefix pasted into the value.
+function cleanKey(value: string | undefined): string {
+  return (value ?? '').trim().replace(/^["']|["']$/g, '').replace(/^EXPO_PUBLIC_[A-Z_]+=/, '').trim();
+}
+
 export async function findRestaurantsForDish(dishName: string, origin: Coordinates, radiusKm = 5): Promise<Restaurant[]> {
-  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
-  if (!apiKey) throw new PlacesConfigurationError('Google Places API key is not configured.');
+  const apiKey = cleanKey(process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY);
+  if (!apiKey || apiKey === 'your_google_places_api_key') {
+    throw new PlacesConfigurationError('Add a Google Places API key to the .env file, then restart Expo.');
+  }
 
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -72,7 +80,13 @@ export async function findRestaurantsForDish(dishName: string, origin: Coordinat
     }),
   });
   if (!response.ok) {
-    const details = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    const details = await response.json().catch(() => null) as { error?: { message?: string; status?: string } } | null;
+    const status = details?.error?.status;
+    if (response.status === 403 || status === 'PERMISSION_DENIED' || /API key not valid/i.test(details?.error?.message ?? '')) {
+      throw new PlacesConfigurationError(
+        'The Google Places key was rejected — check it is a valid key with "Places API (New)" enabled and billing on its project. This search is optional; the rest of Crave works without it.',
+      );
+    }
     throw new PlacesRequestError(details?.error?.message ?? `Restaurant search failed (${response.status}).`);
   }
   const data = await response.json() as { places?: GooglePlace[] };
