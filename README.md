@@ -11,8 +11,7 @@ Crave surfaces the one pick you’ll *all* be happy with, then finds it near you
 
 <br/>
 
-<!-- 👉 After you deploy the web build, replace the href below with your URL (e.g. https://crave.vercel.app) -->
-[![▶ Live demo](https://img.shields.io/badge/▶%20%20LIVE%20DEMO-open%20in%20browser-F76747?style=for-the-badge&labelColor=24211E)](#-live-demo)
+[![▶ Live demo](https://img.shields.io/badge/▶%20%20LIVE%20DEMO-open%20in%20browser-F76747?style=for-the-badge&labelColor=24211E)](https://kay116.github.io/Crave/)
 &nbsp;
 [![Screenshots](https://img.shields.io/badge/screenshots-below-8957E5?style=for-the-badge&labelColor=24211E)](#-screenshots)
 
@@ -35,21 +34,28 @@ Crave surfaces the one pick you’ll *all* be happy with, then finds it near you
 
 ## ▶ Live demo
 
-> **[🍽️ Open Crave in your browser →](#)** &nbsp;<!-- replace # with your deploy URL, e.g. https://crave.vercel.app -->
+> ### [🍽️ &nbsp;Open Crave in your browser →](https://kay116.github.io/Crave/)
 >
-> No install. Tap **“Continue as guest”** to try discovery + swiping instantly, or make a
-> throwaway account to test cross-device sync and craving rooms. On desktop, shrink the
+> No install. Tap **“Continue as guest”** for discovery + swiping instantly, or make a
+> throwaway account to try cross-device sync and craving rooms. On desktop, shrink the
 > window to phone width for the intended layout.
 
-**Not deployed yet?** It’s a static site — two minutes:
+Auto-deployed from `version-4` by [`.github/workflows/deploy-web.yml`](.github/workflows/deploy-web.yml)
+(`expo export` → GitHub Pages). **One-time repo setup:**
 
-```bash
-npx expo export --platform web        # builds ./dist
-# drag ./dist onto app.netlify.com/drop  —  or  —  vercel deploy dist --prod
-```
+1. **Settings → Pages → Build and deployment → Source: “GitHub Actions”.**
+2. **Settings → Secrets and variables → Actions → New repository secret** — add
+   `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   (add `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY` too if you want the nearby search;
+   restrict that key to the Pages domain). *With no secrets the demo still runs in
+   guest-only mode.*
+3. **Supabase → Authentication → URL Configuration → Redirect URLs** — add
+   `https://kay116.github.io/Crave/**` so email links work.
+4. Push, or run the workflow from the **Actions** tab. Live in ~2 minutes.
 
-Then set `EXPO_PUBLIC_APP_URL` to the deployed URL so room-invite links resolve to
-`/room/<code>`, and paste the URL into the link above.
+Prefer Netlify/Vercel? `npx expo export --platform web` → drop `dist/` on
+[app.netlify.com/drop](https://app.netlify.com/drop). Those serve from the root, so
+unset `EXPO_BASE_URL`.
 
 ---
 
