@@ -1,11 +1,12 @@
 import * as Location from 'expo-location';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { SmartImage } from '@/components/smart-image';
 import { useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { dishes } from '@/data/dishes';
 import { Coordinates, findRestaurantsForDish, formatPrice, PlacesConfigurationError, Restaurant } from '@/services/places';
+import { goBack } from '@/services/nav';
 import { shareRestaurant } from '@/services/sharing';
 import { colors, fonts, radius, shadow, spacing } from '@/theme';
 
@@ -51,7 +52,7 @@ export default function NearbyScreen() {
   const loading = status === 'locating' || status === 'searching';
 
   return <SafeAreaView style={styles.safe}>
-    <View style={styles.header}><Pressable onPress={() => router.back()} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.headerCopy}><Text style={styles.headerKicker}>NEARBY FOR</Text><Text numberOfLines={1} style={styles.headerTitle}>{dish.name}</Text></View><SmartImage uri={dish.images[0]?.url ?? dish.image} alt={dish.images[0]?.alt ?? dish.name} style={styles.thumb} /></View>
+    <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack()} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.headerCopy}><Text style={styles.headerKicker}>NEARBY FOR</Text><Text numberOfLines={1} style={styles.headerTitle}>{dish.name}</Text></View><SmartImage uri={dish.images[0]?.url ?? dish.image} alt={dish.images[0]?.alt ?? dish.name} style={styles.thumb} /></View>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
       <View style={styles.locationRow}><View style={styles.pin}><Text style={styles.pinText}>⌖</Text></View><View style={styles.locationCopy}><Text style={styles.locationLabel}>SEARCHING AROUND</Text><Text style={styles.locationText}>{area}</Text></View></View>
       <View style={styles.radiusRow}>{radiusOptions.map((option) => <Pressable key={option} onPress={() => changeRadius(option)} disabled={loading} style={[styles.radiusChip, radiusKm === option && styles.radiusActive]}><Text style={[styles.radiusText, radiusKm === option && styles.radiusTextActive]}>{option} km</Text></Pressable>)}</View>
