@@ -1,10 +1,19 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+// Tolerate the common paste mistakes in a CI secret / .env: surrounding quotes,
+// stray whitespace, or the "KEY=" prefix pasted into the value.
+function clean(value: string | undefined): string {
+  return (value ?? '').trim().replace(/^["']|["']$/g, '').replace(/^EXPO_PUBLIC_[A-Z_]+=/, '').trim();
+}
+
+const rawUrl = clean(process.env.EXPO_PUBLIC_SUPABASE_URL);
+const publishableKey = clean(process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+// Only treat the URL as usable if it actually looks like one — a malformed value
+// degrades to guest-only mode instead of crashing the bundle / static export.
+const url = /^https:\/\/[^\s/]+\.[^\s/]+/i.test(rawUrl) ? rawUrl : '';
 
 export const isSupabaseConfigured = Boolean(url && publishableKey);
 
@@ -26,8 +35,10 @@ const authHash = readAuthHash();
 export const recoveryLinkInUrl = authHash.recovery;
 export const recoveryLinkError = authHash.recovery ? null : authHash.error;
 
-export const supabase = isSupabaseConfigured
-  ? createClient(url!, publishableKey!, {
+function makeClient(): SupabaseClient | null {
+  if (!isSupabaseConfigured) return null;
+  try {
+    return createClient(url, publishableKey, {
       auth: {
         ...(isWeb ? {} : { storage: AsyncStorage }),
         autoRefreshToken: true,
@@ -36,8 +47,13 @@ export const supabase = isSupabaseConfigured
         // and password-reset links carry in the URL fragment.
         detectSessionInUrl: isWeb,
       },
-    })
-  : null;
+    });
+  } catch {
+    return null;
+  }
+}
+
+export const supabase = makeClient();
 
 if (supabase && !isWeb) {
   AppState.addEventListener('change', (state) => {
