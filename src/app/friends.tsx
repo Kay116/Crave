@@ -163,7 +163,11 @@ export default function FriendsScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Share room ${entry.name}`}
-                    onPress={() => shareRoomInvite(entry.name, entry.code)}
+                    onPress={async () => {
+                      const outcome = await shareRoomInvite(entry.name, entry.code);
+                      if (outcome === 'copied') setMessage(`Invitation for “${entry.name}” copied.`);
+                      else if (outcome === 'unavailable') setMessage(`Sharing isn’t available here — code: ${entry.code}`);
+                    }}
                     style={styles.recentShare}
                   >
                     <Text style={styles.recentShareText}>Share</Text>

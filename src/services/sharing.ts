@@ -13,8 +13,48 @@ type WebNavigator = {
   clipboard?: { writeText?: (text: string) => Promise<void> };
 };
 
+const webNavigator = () => (typeof navigator !== 'undefined' ? (navigator as WebNavigator) : undefined);
+
+// Last-resort clipboard write for contexts where navigator.clipboard is blocked
+// (e.g. a cross-origin iframe without clipboard-write permission).
+function legacyCopy(text: string): boolean {
+  if (typeof document === 'undefined') return false;
+  try {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.top = '-1000px';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    area.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(area);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function copyText(text: string): Promise<boolean> {
+  if (Platform.OS !== 'web') {
+    return shareText({ message: text }).then((r) => r === 'shared');
+  }
+  const nav = webNavigator();
+  if (nav?.clipboard?.writeText) {
+    try {
+      await nav.clipboard.writeText(text);
+      return true;
+    } catch {
+      /* fall through */
+    }
+  }
+  return legacyCopy(text);
+}
+
 async function shareOnWeb(title: string | undefined, message: string, url?: string): Promise<ShareOutcome> {
-  const nav = (typeof navigator !== 'undefined' ? navigator : undefined) as WebNavigator | undefined;
+  const nav = webNavigator();
   const full = url ? `${message}\n${url}` : message;
   if (nav?.share) {
     try {
@@ -22,7 +62,7 @@ async function shareOnWeb(title: string | undefined, message: string, url?: stri
       return 'shared';
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return 'dismissed';
-      // fall through to clipboard
+      // otherwise fall back to copying
     }
   }
   if (nav?.clipboard?.writeText) {
@@ -30,10 +70,10 @@ async function shareOnWeb(title: string | undefined, message: string, url?: stri
       await nav.clipboard.writeText(full);
       return 'copied';
     } catch {
-      /* ignore */
+      /* fall through */
     }
   }
-  return 'unavailable';
+  return legacyCopy(full) ? 'copied' : 'unavailable';
 }
 
 export async function shareText(opts: { title?: string; message: string; url?: string }): Promise<ShareOutcome> {

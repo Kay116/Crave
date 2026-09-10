@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoom } from '@/context/room-context';
-import { shareRoomInvite } from '@/services/sharing';
+import { copyText, roomInviteUrl, shareRoomInvite } from '@/services/sharing';
 import { colors, fonts, radius, shadow, spacing } from '@/theme';
 
 const CONNECTION_COPY: Record<string, string> = {
@@ -15,6 +16,7 @@ const CONNECTION_COPY: Record<string, string> = {
 export default function RoomLobbyScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
   const room = useRoom();
+  const [shareNote, setShareNote] = useState<string | null>(null);
 
   if (room.screenState === 'loading') {
     return <View style={styles.center}><ActivityIndicator color={colors.coral} /><Text style={styles.centerText}>Opening room…</Text></View>;
@@ -68,6 +70,18 @@ export default function RoomLobbyScreen() {
     router.push({ pathname: '/room/[code]/swipe', params: { code: data.code } });
   };
 
+  const onShare = async () => {
+    const outcome = await shareRoomInvite(data.name, data.code);
+    if (outcome === 'copied') setShareNote('Invitation copied — paste it to a friend.');
+    else if (outcome === 'unavailable') setShareNote(`Sharing isn’t available here. Send them the code: ${data.code}`);
+    else setShareNote(null);
+  };
+
+  const onCopyCode = async () => {
+    const ok = await copyText(roomInviteUrl(data.code) ?? data.code);
+    setShareNote(ok ? 'Copied. Paste it to a friend.' : `Copy that code: ${data.code}`);
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <Header code={code} />
@@ -81,11 +95,15 @@ export default function RoomLobbyScreen() {
 
         <View style={styles.codeCard}>
           <Text style={styles.codeLabel}>INVITATION CODE</Text>
-          <Text style={styles.code} accessibilityLabel={`Invitation code ${data.code.split('').join(' ')}`}>{data.code}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Share this room" onPress={() => shareRoomInvite(data.name, data.code)} style={styles.shareBtn}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Copy invitation code ${data.code.split('').join(' ')}`} onPress={onCopyCode}>
+            <Text style={styles.code}>{data.code}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Share this room" onPress={onShare} style={styles.shareBtn}>
             <Text style={styles.shareText}>Share invitation</Text>
             <Text style={styles.shareText}>↗</Text>
           </Pressable>
+          {shareNote && <Text style={styles.shareNote}>{shareNote}</Text>}
+          <Text style={styles.codeHint}>Tap the code to copy it.</Text>
           {data.expiresAt != null && (
             <Text style={styles.expiry}>Closes {new Date(data.expiresAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</Text>
           )}
@@ -166,6 +184,8 @@ const styles = StyleSheet.create({
   code: { color: colors.white, fontWeight: '900', fontSize: 40, letterSpacing: 8, marginTop: 8, marginLeft: 8 },
   shareBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.coral, borderRadius: radius.full, paddingHorizontal: 20, paddingVertical: 12, marginTop: 14 },
   shareText: { color: colors.white, fontWeight: '900', fontSize: 13 },
+  shareNote: { color: '#FFD2C7', fontSize: 11, textAlign: 'center', marginTop: 12, lineHeight: 16 },
+  codeHint: { color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 8 },
   expiry: { color: 'rgba(255,255,255,0.6)', fontSize: 10, marginTop: 12 },
   status: { color: colors.charcoal, fontSize: 14, lineHeight: 20, marginTop: 20, fontWeight: '600' },
   errorLine: { color: colors.coral, fontSize: 12, marginTop: 8 },
