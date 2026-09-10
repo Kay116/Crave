@@ -18,9 +18,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session)).finally(() => setLoading(false));
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
-    return () => data.subscription.unsubscribe();
+    let active = true;
+    // Resolve the initial session before anything downstream decides which local
+    // state to hydrate. `loading` stays true until this (or the first auth event)
+    // settles. Never log the session, its user id, or any token.
+    supabase.auth.getSession()
+      .then(({ data }) => { if (active) setSession(data.session); })
+      .finally(() => { if (active) setLoading(false); });
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!active) return;
+      setSession(nextSession);
+      setLoading(false);
+    });
+    return () => { active = false; data.subscription.unsubscribe(); };
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
