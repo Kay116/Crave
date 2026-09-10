@@ -61,11 +61,26 @@ unset `EXPO_BASE_URL`.
 
 ## 📸 Screenshots
 
-> _Add three PNGs to `docs/screenshots/` — see [`docs/screenshots/README.md`](docs/screenshots/README.md) for the exact shots and sizes. A short `demo.gif` here is even better._
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/preferences.png" alt="Mood and cuisine picker" /></td>
+    <td width="50%"><img src="docs/screenshots/swipe.png" alt="Swipe card with photo dots and the filter-relaxation note" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Set the vibe</b> — moods, cuisines, and optional filters</td>
+    <td align="center"><b>Swipe the deck</b> — tap the edges for more photos; over-strict filters relax and say so</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/rooms.png" alt="Create or join a craving room" /></td>
+    <td width="50%"><img src="docs/screenshots/nearby.png" alt="Live Google Places results for the picked dish" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Decide as a group</b> — share a code, everyone swipes the same deck</td>
+    <td align="center"><b>Find it near you</b> — live Google Places results for the pick</td>
+  </tr>
+</table>
 
-| Swipe to discover | Your match, explained | Decide as a group |
-| :---: | :---: | :---: |
-| ![Swipe screen](docs/screenshots/swipe.png) | ![Results screen](docs/screenshots/results.png) | ![Craving room](docs/screenshots/room.png) |
+<sub>Add your PNGs to <a href="docs/screenshots/"><code>docs/screenshots/</code></a> — <a href="docs/screenshots/README.md">guide here</a>. A short <code>demo.gif</code> works even better.</sub>
 
 ---
 

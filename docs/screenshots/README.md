@@ -1,25 +1,23 @@
 # Screenshots
 
-The main `README.md` shows three images from this folder. Add them here with
-these exact names:
+The main `README.md` shows four images from this folder. Save your captures here
+with **exactly** these names:
 
-| File | What to capture | How |
+| File | Screen | How to get there |
 | --- | --- | --- |
-| `swipe.png` | The swipe screen with a dish card (photo dots + "Details" visible) | `npm run web` → Surprise me → swipe screen |
-| `results.png` | The solo results screen ("Tonight feels like… / <dish> / 98% MATCH") | swipe through ~8 dishes |
-| `room.png` | A craving room lobby (big invitation code + participant list) | sign in → Friends → Create room |
+| `preferences.png` | Mood / cuisine picker | open the app → **preferences** screen |
+| `swipe.png` | A dish card (photo dots + "Details") | pick a mood → **swipe** screen |
+| `rooms.png` | Create / join a craving room | sign in → **Friends** |
+| `nearby.png` | Live restaurant results for a dish | swipe → results → **Find it nearby** (needs a working Google Places key) |
 
 ## Tips
 
-- **Size:** ~1000–1200 px wide. On web, resize the browser to a phone-ish width
-  (~420 px) first so the layout looks like the app, then screenshot and let it
-  scale down.
-- **Format:** PNG. Keep each file under ~500 KB (use a compressor like
-  [squoosh.app](https://squoosh.app) if needed) — GitHub renders them faster and
-  the repo stays small.
-- A short **GIF** of a few swipes + the results reveal works even better than a
-  still; name it `demo.gif` and swap the first table cell in `README.md` for it.
-- Optional 4th shot: the expanded "More options" filters, or the dish-details
-  modal with the photo carousel.
+- **Size:** ~700–1200 px wide. On web, shrink the window to phone width (~420 px)
+  first so it looks like the app, then screenshot.
+- **Format:** PNG, ideally under ~500 KB each (compress at
+  [squoosh.app](https://squoosh.app) if needed).
+- Windows: `Win` + `Shift` + `S` → drag a box → paste into Paint → Save As PNG.
+- A short **GIF** of a few swipes + the results reveal beats any still — name it
+  `demo.gif` and reference it at the top of `README.md`.
 
-Until the files exist, the README shows broken-image icons — that's expected.
+Missing files just show a broken-image icon until you add them.
