@@ -24,11 +24,15 @@ const Context = createContext<AuthContextValue | null>(null);
 
 const NOT_CONFIGURED = 'Add your Supabase project URL and publishable key to .env.local.';
 
-// Where confirmation / reset emails send the user back to. On web this must be
-// the exact running origin (and be listed under Supabase → Authentication → URL
-// Configuration → Redirect URLs); on native it is the app's deep-link scheme.
+// Where confirmation / reset emails send the user back to — must be listed under
+// Supabase → Authentication → URL Configuration → Redirect URLs. On web we prefer
+// EXPO_PUBLIC_APP_URL (it carries any base path, e.g. a GitHub Pages "/repo"
+// subpath) and fall back to the running origin; on native it is the deep link.
 const emailRedirectTo = () => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') return `${window.location.origin}/auth`;
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const base = (process.env.EXPO_PUBLIC_APP_URL || window.location.origin).replace(/\/+$/, '');
+    return `${base}/auth`;
+  }
   return Linking.createURL('/auth');
 };
 
