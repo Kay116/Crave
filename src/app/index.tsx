@@ -4,13 +4,18 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@/context/auth-context';
 import { useCrave } from '@/context/crave-context';
 import { colors, fonts, radius, shadow, spacing } from '@/theme';
 
 export default function WelcomeScreen() {
   const { hydrated, hasOnboarded, completeOnboarding } = useCrave();
+  const { recovering, recoveryError } = useAuth();
   const [starting, setStarting] = useState(false);
 
+  // A password-reset link may land here if Supabase's Site URL is "/". Send it
+  // to the screen that handles the new-password step.
+  if (recovering || recoveryError) return <Redirect href="/auth" />;
   if (!hydrated) return <View style={styles.loading}><ActivityIndicator color={colors.coral} /></View>;
   // Returning users go straight to preferences — but not while we are actively
   // sending a first-time user to signup, or the redirect would win the race.

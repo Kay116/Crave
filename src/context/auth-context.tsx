@@ -1,7 +1,8 @@
 import { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
-import { isSupabaseConfigured, supabase } from '@/services/supabase';
+import { Platform } from 'react-native';
+import { isSupabaseConfigured, recoveryLinkError, recoveryLinkInUrl, supabase } from '@/services/supabase';
 
 type AuthResult = { error?: string; needsEmailConfirmation?: boolean };
 type AuthContextValue = {
@@ -9,6 +10,8 @@ type AuthContextValue = {
   // True after the user returns via a password-reset link and still needs to
   // choose a new password. Cleared once the password is updated.
   recovering: boolean;
+  // Set when a reset/confirmation link came back with an error (expired, reused).
+  recoveryError: string | null;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (email: string, password: string, displayName: string) => Promise<AuthResult>;
   signOut: () => Promise<AuthResult>;
@@ -20,14 +23,22 @@ type AuthContextValue = {
 const Context = createContext<AuthContextValue | null>(null);
 
 const NOT_CONFIGURED = 'Add your Supabase project URL and publishable key to .env.local.';
-// Where the confirmation / reset email should send the user back to. Resolves to
-// the current origin on web and the app's deep-link scheme on native.
-const emailRedirectTo = () => Linking.createURL('/auth');
+
+// Where confirmation / reset emails send the user back to. On web this must be
+// the exact running origin (and be listed under Supabase → Authentication → URL
+// Configuration → Redirect URLs); on native it is the app's deep-link scheme.
+const emailRedirectTo = () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') return `${window.location.origin}/auth`;
+  return Linking.createURL('/auth');
+};
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
-  const [recovering, setRecovering] = useState(false);
+  // Seed from the URL fragment so the "set a new password" screen shows even if
+  // the PASSWORD_RECOVERY event fires before this provider mounts.
+  const [recovering, setRecovering] = useState(recoveryLinkInUrl);
+  const [recoveryError, setRecoveryError] = useState<string | null>(recoveryLinkError);
 
   useEffect(() => {
     if (!supabase) return;
@@ -42,7 +53,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (!active) return;
       setSession(nextSession);
       setLoading(false);
-      if (event === 'PASSWORD_RECOVERY') setRecovering(true);
+      if (event === 'PASSWORD_RECOVERY') { setRecovering(true); setRecoveryError(null); }
     });
     return () => { active = false; data.subscription.unsubscribe(); };
   }, []);
@@ -53,6 +64,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     loading,
     configured: isSupabaseConfigured,
     recovering,
+    recoveryError,
     signIn: async (email, password) => {
       if (!supabase) return { error: NOT_CONFIGURED };
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -88,9 +100,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) return { error: error.message };
       setRecovering(false);
+      setRecoveryError(null);
       return {};
     },
-  }), [session, loading, recovering]);
+  }), [session, loading, recovering, recoveryError]);
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

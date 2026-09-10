@@ -159,6 +159,31 @@ so the room still converges after a manual refresh if Realtime drops.
 
 ---
 
+## Email links (confirmation & password reset)
+
+Confirmation and password-reset emails send the user back to `<origin>/auth`.
+For that to work:
+
+1. **Supabase → Authentication → URL Configuration → Redirect URLs** — add every
+   origin the app runs on, e.g.
+   `http://localhost:8081/auth`, `http://localhost:8081/**`,
+   `https://your-app.example.com/auth`, `https://your-app.example.com/**`,
+   and `crave://auth` for the native build.
+   *If the redirect URL isn't allow-listed, Supabase silently ignores it and
+   sends the user to the **Site URL** instead — which is the usual cause of a
+   blank page after clicking a reset link.*
+2. **Site URL** — set it to the origin you actually serve (e.g.
+   `http://localhost:8081` in dev, your public URL in prod).
+3. The web client uses `detectSessionInUrl: true`, so supabase-js reads the
+   session/`type=recovery` params from the URL fragment on load. `auth.tsx` then
+   shows **"Set a new password"** (or **"That link didn't work"** for an
+   expired/used link → *Send a new reset link*).
+
+On native, the reset link opens `crave://auth`; test it on a device or simulator
+where that scheme is registered.
+
+---
+
 ## `EXPO_PUBLIC_APP_URL` setup
 
 Set this to the **public HTTPS origin** where the web build is hosted (no
