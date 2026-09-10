@@ -1,54 +1,12 @@
--- Run once in the Supabase SQL Editor for Crave Version 3.
-create table if not exists public.preference_sessions (
-  id text not null,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  moods text[] not null default '{}',
-  cuisines text[] not null default '{}',
-  created_at timestamptz not null default now(),
-  primary key (user_id, id)
-);
-
-create table if not exists public.swipe_events (
-  id bigint generated always as identity primary key,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  client_id text not null,
-  dish_id text not null,
-  choice text not null check (choice in ('like', 'pass')),
-  swiped_at timestamptz not null default now()
-);
-
-create table if not exists public.saved_dishes (
-  user_id uuid not null references auth.users(id) on delete cascade,
-  dish_id text not null,
-  created_at timestamptz not null default now(),
-  primary key (user_id, dish_id)
-);
-
-create index if not exists preference_sessions_user_date_idx on public.preference_sessions(user_id, created_at desc);
-create index if not exists swipe_events_user_date_idx on public.swipe_events(user_id, swiped_at desc);
-create unique index if not exists swipe_events_user_client_idx on public.swipe_events(user_id, client_id);
-
-alter table public.preference_sessions enable row level security;
-alter table public.swipe_events enable row level security;
-alter table public.saved_dishes enable row level security;
-
-drop policy if exists "Users manage their preference sessions" on public.preference_sessions;
-drop policy if exists "Users manage their swipe history" on public.swipe_events;
-drop policy if exists "Users manage their saved dishes" on public.saved_dishes;
-
-create policy "Users manage their preference sessions" on public.preference_sessions
-  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-create policy "Users manage their swipe history" on public.swipe_events
-  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-create policy "Users manage their saved dishes" on public.saved_dishes
-  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-
 -- ===========================================================================
--- Version 4 — shared craving rooms
--- The statements below are identical to supabase/migrations/0001_v4_craving_rooms.sql
--- and are safe to re-run.
+-- Crave Version 4 — shared craving rooms
+-- ---------------------------------------------------------------------------
+-- Idempotent. Run once in the Supabase SQL Editor on an existing Version 3
+-- project. The same statements are also included in supabase/schema.sql for
+-- fresh installs.
 -- ===========================================================================
 
+-- --------------------------------------------------------------------- tables
 create table if not exists public.craving_rooms (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
@@ -85,16 +43,29 @@ create index if not exists craving_rooms_creator_idx on public.craving_rooms (cr
 create index if not exists room_members_user_idx on public.room_members (user_id);
 create index if not exists room_swipes_room_idx on public.room_swipes (room_id);
 
+-- ------------------------------------------------------------------- helpers
+-- Membership check used by every room policy / definer function.
 create or replace function public.is_room_member(p_room_id uuid, p_user_id uuid)
-returns boolean language sql stable security definer set search_path = public as $$
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
   select exists (
     select 1 from public.room_members m
     where m.room_id = p_room_id and m.user_id = p_user_id
   );
 $$;
 
+-- Secure random, human-friendly invitation code (no 0/O/1/I/L). Derives its
+-- bytes from gen_random_uuid() (122 random bits), retrying on collision.
 create or replace function public.generate_room_code()
-returns text language plpgsql security definer set search_path = public as $$
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
 declare
   alphabet constant text := 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   raw bytea;
@@ -113,16 +84,27 @@ begin
 end;
 $$;
 
+-- Create a room and add the creator as its first member, atomically.
 create or replace function public.create_craving_room(
-  p_name text, p_dish_ids text[], p_moods text[], p_cuisines text[], p_display_name text, p_expires boolean default false
+  p_name text,
+  p_dish_ids text[],
+  p_moods text[],
+  p_cuisines text[],
+  p_display_name text,
+  p_expires boolean default false
 )
-returns public.craving_rooms language plpgsql security definer set search_path = public as $$
+returns public.craving_rooms
+language plpgsql
+security definer
+set search_path = public
+as $$
 declare
   v_room public.craving_rooms;
 begin
   if auth.uid() is null then
     raise exception 'Sign in to create a room';
   end if;
+
   insert into public.craving_rooms (code, name, created_by, dish_ids, selected_moods, selected_cuisines, expires_at)
   values (
     public.generate_room_code(),
@@ -134,22 +116,35 @@ begin
     case when p_expires then now() + interval '24 hours' else null end
   )
   returning * into v_room;
+
   insert into public.room_members (room_id, user_id, display_name)
   values (v_room.id, auth.uid(), coalesce(nullif(trim(p_display_name), ''), 'Guest'))
   on conflict (room_id, user_id) do nothing;
+
   return v_room;
 end;
 $$;
 
+-- Join a room by invitation code. This is the only way to become a member of a
+-- room you did not create, so rooms are never exposed by guessing a UUID.
 create or replace function public.join_craving_room(p_code text, p_display_name text)
-returns public.craving_rooms language plpgsql security definer set search_path = public as $$
+returns public.craving_rooms
+language plpgsql
+security definer
+set search_path = public
+as $$
 declare
   v_room public.craving_rooms;
 begin
   if auth.uid() is null then
     raise exception 'Sign in to join a room';
   end if;
-  select * into v_room from public.craving_rooms r where r.code = upper(trim(p_code)) limit 1;
+
+  select * into v_room
+  from public.craving_rooms r
+  where r.code = upper(trim(p_code))
+  limit 1;
+
   if v_room.id is null then
     raise exception 'That invitation code is not valid';
   end if;
@@ -159,16 +154,23 @@ begin
   if v_room.expires_at is not null and v_room.expires_at < now() then
     raise exception 'That room has expired';
   end if;
+
   insert into public.room_members (room_id, user_id, display_name)
   values (v_room.id, auth.uid(), coalesce(nullif(trim(p_display_name), ''), 'Guest'))
   on conflict (room_id, user_id) do nothing;
+
   return v_room;
 end;
 $$;
 
+-- Aggregate results only: counts per dish, never who voted which way.
 create or replace function public.room_results(p_room_id uuid)
 returns table (dish_id text, likes integer, passes integer, voters integer)
-language plpgsql stable security definer set search_path = public as $$
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
 begin
   if not public.is_room_member(p_room_id, auth.uid()) then
     raise exception 'Not a member of this room';
@@ -190,6 +192,7 @@ grant execute on function public.join_craving_room(text, text) to authenticated;
 grant execute on function public.room_results(uuid) to authenticated;
 grant execute on function public.is_room_member(uuid, uuid) to authenticated;
 
+-- ----------------------------------------------------------------------- RLS
 alter table public.craving_rooms enable row level security;
 alter table public.room_members enable row level security;
 alter table public.room_swipes enable row level security;
@@ -204,11 +207,14 @@ drop policy if exists "Read own swipes" on public.room_swipes;
 drop policy if exists "Insert own swipes" on public.room_swipes;
 drop policy if exists "Update own swipes" on public.room_swipes;
 
+-- craving_rooms: readable only by members; updatable only by the creator.
 create policy "Members read their rooms" on public.craving_rooms
   for select using (public.is_room_member(id, auth.uid()));
 create policy "Creator updates the room" on public.craving_rooms
   for update using (created_by = auth.uid()) with check (created_by = auth.uid());
 
+-- room_members: a member can see the other members of the same room. The
+-- creator may self-insert; the join RPC (definer) covers everyone else.
 create policy "Members read co-members" on public.room_members
   for select using (public.is_room_member(room_id, auth.uid()));
 create policy "Self join as creator" on public.room_members
@@ -221,6 +227,7 @@ create policy "Update own membership" on public.room_members
 create policy "Leave own membership" on public.room_members
   for delete using (user_id = auth.uid());
 
+-- room_swipes: participants only ever touch their own rows.
 create policy "Read own swipes" on public.room_swipes
   for select using (user_id = auth.uid() and public.is_room_member(room_id, auth.uid()));
 create policy "Insert own swipes" on public.room_swipes
@@ -228,12 +235,19 @@ create policy "Insert own swipes" on public.room_swipes
 create policy "Update own swipes" on public.room_swipes
   for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-do $$ begin
+-- ------------------------------------------------------------------ realtime
+do $$
+begin
   alter publication supabase_realtime add table public.craving_rooms;
-exception when duplicate_object then null; end $$;
-do $$ begin
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
   alter publication supabase_realtime add table public.room_members;
-exception when duplicate_object then null; end $$;
-do $$ begin
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
   alter publication supabase_realtime add table public.room_swipes;
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null;
+end $$;
